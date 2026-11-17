@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Technical Viva Examination System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glassmorphism {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 min-h-screen text-slate-100 flex flex-col justify-between">
+  <!-- Navbar -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 font-bold text-xl text-white">
+          AI
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white">Viva Examination Portal</h1>
+          <p class="text-xs text-indigo-400 font-medium">FastAPI • Generative AI Oral Evaluator</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="/docs" target="_blank" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          Swagger Docs ↗
+        </a>
+        <span id="system-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ready
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-4xl mx-auto px-4 py-8 flex-1 w-full">
+
+    <!-- STEP 1: Registration Card -->
+    <div id="setup-card" class="bg-slate-800/90 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-2xl">
+      <div class="mb-6">
+        <span class="text-xs font-semibold uppercase tracking-wider text-indigo-400">Oral Viva Examination</span>
+        <h2 class="text-2xl font-bold text-white mt-1">Start Candidate Viva Session</h2>
+        <p class="text-slate-400 text-sm mt-1">Configure candidate credentials and subject parameters. Exactly 3 technical questions will be dynamically evaluated.</p>
+      </div>
+
+      <form id="setup-form" class="space-y-5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Student Name</label>
+          <input type="text" id="student_name" required placeholder="e.g. Alex Johnson"
+            class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 outline-none transition text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Technical Subject</label>
+          <input type="text" id="subject" required placeholder="e.g. Operating Systems, Python, Machine Learning, DBMS"
+            class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 outline-none transition text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Difficulty Level</label>
+          <select id="difficulty" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white outline-none transition text-sm">
+            <option value="Easy">Easy (Fundamental Definitions & Basics)</option>
+            <option value="Medium" selected>Medium (Architecture & Mechanisms)</option>
+            <option value="Hard">Hard (Deep Dive & Performance Trade-offs)</option>
+          </select>
+        </div>
+
+        <button type="submit" id="btn-start"
+          class="w-full py-3.5 px-6 rounded-xl font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition duration-200 flex items-center justify-center space-x-2">
+          <span>Begin Examination</span>
+          <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <!-- STEP 2: Active Viva Question Card -->
+    <div id="viva-card" class="hidden space-y-6">
+      <!-- Session Header Bar -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center space-x-2">
+          <span class="text-slate-400">Candidate:</span>
+          <span id="badge-name" class="font-semibold text-white"></span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-slate-400">Subject:</span>
+          <span id="badge-subject" class="font-semibold text-indigo-400"></span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-slate-400">Level:</span>
+          <span id="badge-difficulty" class="px-2 py-0.5 rounded bg-slate-700 text-slate-200 font-medium"></span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-slate-400">Session ID:</span>
+          <span id="badge-session" class="font-mono text-slate-400 truncate max-w-[120px]"></span>
+        </div>
+      </div>
+
+      <!-- Question Box -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+            <span id="q-counter">Question 1 of 3</span>
+          </div>
+          <!-- Progress bar dots -->
+          <div class="flex items-center space-x-1.5" id="dots-container">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+          </div>
+        </div>
+
+        <h3 id="current-question-text" class="text-lg md:text-xl font-medium text-slate-100 leading-relaxed mb-6">
+          Generating question...
+        </h3>
+
+        <!-- Previous Feedback Accordion (shown if q > 1) -->
+        <div id="prev-feedback-box" class="hidden mb-6 p-4 rounded-xl bg-slate-900/90 border border-indigo-900/50">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="font-semibold text-indigo-400 uppercase tracking-wider">Evaluation for Previous Question:</span>
+            <span id="prev-score-badge" class="font-bold text-amber-400"></span>
+          </div>
+          <p id="prev-feedback-text" class="text-xs text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- Student Answer Input Form -->
+        <form id="answer-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Answer / Oral Explanation</label>
+            <textarea id="answer-text" rows="5" required
+              placeholder="Provide a comprehensive technical answer explaining definitions, mechanisms, and reasoning..."
+              class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 outline-none text-sm leading-relaxed transition"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span class="text-xs text-slate-500">Evaluated on technical accuracy, completeness & terminology (Score / 10).</span>
+            <button type="submit" id="btn-submit-ans"
+              class="py-3 px-6 rounded-xl font-semibold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-lg shadow-emerald-600/30 transition flex items-center space-x-2">
+              <span id="btn-submit-ans-label">Submit Answer</span>
+              <svg id="submit-spinner" class="hidden animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- STEP 3: Final Performance Report Card -->
+    <div id="report-card" class="hidden space-y-6">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-2xl">
+        <div class="border-b border-slate-700 pb-6 mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Viva Concluded • Official Examination Result</span>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-white mt-1">Viva Performance Report</h2>
+            <p class="text-sm text-slate-400 mt-1" id="report-meta"></p>
+          </div>
+
+          <!-- Average Score Badge -->
+          <div class="bg-gradient-to-br from-indigo-900/60 to-purple-900/60 border border-indigo-700/60 rounded-2xl p-4 text-center min-w-[140px]">
+            <span class="text-xs uppercase text-indigo-300 font-semibold tracking-wider">Average Marks</span>
+            <div class="text-3xl font-black text-white mt-1" id="report-avg-score">0.0 <span class="text-sm font-normal text-slate-400">/ 10</span></div>
+          </div>
+        </div>
+
+        <!-- Scores Breakdown Grid -->
+        <div class="mb-6">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Scores by Question</h4>
+          <div class="grid grid-cols-3 gap-3" id="scores-grid"></div>
+        </div>
+
+        <!-- Overall Assessment -->
+        <div class="mb-6 bg-slate-900/80 border border-slate-700/80 rounded-xl p-5">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Overall Assessment</h4>
+          <p id="report-assessment" class="text-sm text-slate-200 leading-relaxed"></p>
+        </div>
+
+        <!-- Areas for Improvement -->
+        <div class="mb-8 bg-slate-900/80 border border-slate-700/80 rounded-xl p-5">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">Areas for Improvement</h4>
+          <ul id="report-improvements" class="list-disc list-inside space-y-1.5 text-sm text-slate-300"></ul>
+        </div>
+
+        <!-- Question Log Details -->
+        <div class="mb-6">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Detailed Viva Transcript & Feedback</h4>
+          <div id="transcript-list" class="space-y-4"></div>
+        </div>
+
+        <!-- Restart Button -->
+        <div class="pt-4 border-t border-slate-700 flex justify-end">
+          <button onclick="location.reload()"
+            class="px-6 py-3 rounded-xl font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-lg shadow-indigo-600/30">
+            Conduct New Viva Examination
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-900/90 py-4 text-center text-xs text-slate-500">
+    AI-Based Technical Viva Interview System • FastAPI • Generative AI Oral Evaluator
+  </footer>
+
+  <script>
+    let currentSessionId = null;
+    let currentQuestionNum = 1;
+
+    // Start Viva Session
+    document.getElementById('setup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-start');
+      btn.disabled = true;
+      btn.innerHTML = `<span>Starting Examination...</span>`;
+
+      const studentName = document.getElementById('student_name').value.trim();
+      const subject = document.getElementById('subject').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+
+      try {
+        const res = await fetch('/api/viva/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_name: studentName, subject: subject, difficulty: difficulty })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to start viva');
+
+        currentSessionId = data.session_id;
+        currentQuestionNum = data.question_number;
+
+        // Populate badges
+        document.getElementById('badge-name').textContent = data.student_name;
+        document.getElementById('badge-subject').textContent = data.subject;
+        document.getElementById('badge-difficulty').textContent = data.difficulty;
+        document.getElementById('badge-session').textContent = data.session_id;
+
+        // Populate question
+        updateQuestionView(data.question_number, data.question);
+
+        // Switch cards
+        document.getElementById('setup-card').classList.add('hidden');
+        document.getElementById('viva-card').classList.remove('hidden');
+      } catch (err) {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = `<span>Begin Examination</span>`;
+      }
+    });
+
+    // Submit Answer
+    document.getElementById('answer-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ansText = document.getElementById('answer-text').value.trim();
+      if (!ansText) return;
+
+      const btn = document.getElementById('btn-submit-ans');
+      const label = document.getElementById('btn-submit-ans-label');
+      const spinner = document.getElementById('submit-spinner');
+
+      btn.disabled = true;
+      label.textContent = "AI Evaluating Answer...";
+      spinner.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/viva/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId, answer: ansText })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Evaluation failed');
+
+        document.getElementById('answer-text').value = '';
+
+        if (data.is_completed) {
+          // Render Final Report
+          renderPerformanceReport(data.performance_report);
+        } else {
+          // Show Feedback for previous and advance to next question
+          showPreviousFeedback(data.question_number_evaluated, data.score, data.feedback);
+          currentQuestionNum = data.next_question_number;
+          updateQuestionView(data.next_question_number, data.next_question);
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        label.textContent = "Submit Answer";
+        spinner.classList.add('hidden');
+      }
+    });
+
+    function updateQuestionView(qNum, qText) {
+      document.getElementById('q-counter').textContent = `Question ${qNum} of 3`;
+      document.getElementById('current-question-text').textContent = qText;
+
+      // Update dots
+      const dots = document.getElementById('dots-container').children;
+      for (let i = 0; i < dots.length; i++) {
+        if (i < qNum) {
+          dots[i].className = 'w-2.5 h-2.5 rounded-full bg-indigo-500';
+        } else {
+          dots[i].className = 'w-2.5 h-2.5 rounded-full bg-slate-700';
+        }
+      }
+    }
+
+    function showPreviousFeedback(qNum, score, feedback) {
+      const box = document.getElementById('prev-feedback-box');
+      box.classList.remove('hidden');
+      document.getElementById('prev-score-badge').textContent = `Score: ${score} / 10`;
+      document.getElementById('prev-feedback-text').textContent = feedback;
+    }
+
+    function renderPerformanceReport(report) {
+      document.getElementById('viva-card').classList.add('hidden');
+      document.getElementById('report-card').classList.remove('hidden');
+
+      document.getElementById('report-meta').textContent =
+        `Candidate: ${report.student_name} | Subject: ${report.subject} | Level: ${report.difficulty}`;
+      document.getElementById('report-avg-score').innerHTML = `${report.average_marks} <span class="text-sm font-normal text-slate-400">/ 10</span>`;
+      document.getElementById('report-assessment').textContent = report.overall_assessment;
+
+      // Improvement Areas
+      const impList = document.getElementById('report-improvements');
+      impList.innerHTML = '';
+      (report.areas_for_improvement || []).forEach(area => {
+        const li = document.createElement('li');
+        li.textContent = area;
+        impList.appendChild(li);
+      });
+
+      // Score Cards
+      const scoreGrid = document.getElementById('scores-grid');
+      scoreGrid.innerHTML = '';
+      (report.scores || []).forEach((score, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900 border border-slate-700 rounded-xl p-3 text-center';
+        card.innerHTML = `
+          <div class="text-xs text-slate-400 font-medium">Question ${idx + 1}</div>
+          <div class="text-lg font-bold text-white mt-1">${score} <span class="text-xs text-slate-500">/10</span></div>
+        `;
+        scoreGrid.appendChild(card);
+      });
+
+      // Transcript
+      const transList = document.getElementById('transcript-list');
+      transList.innerHTML = '';
+      (report.evaluations || []).forEach(item => {
+        const itemBox = document.createElement('div');
+        itemBox.className = 'bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 text-xs space-y-2';
+        itemBox.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-indigo-400">Question ${item.question_number}: ${item.question}</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 font-semibold border border-indigo-800">${item.score}/10</span>
+          </div>
+          <div class="text-slate-300"><span class="text-slate-500 font-medium">Candidate Answer:</span> ${item.student_answer}</div>
+          <div class="text-emerald-300 bg-emerald-950/30 p-2 rounded border border-emerald-900/40"><span class="font-semibold text-emerald-400">Feedback:</span> ${item.feedback}</div>
+        `;
+        transList.appendChild(itemBox);
+      });
+    }
+  </script>
+</body>
+</html>
