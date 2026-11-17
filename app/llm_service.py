@@ -48,14 +48,14 @@ class LLMService:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert university technical viva examiner."
+                        "content": "You are an expert university technical viva examiner. When difficulty is Easy, ask short, direct questions requiring concise or one-word answers."
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                "temperature": 0.4
+                "temperature": 0.3
             }
             if is_json:
                 kwargs["response_format"] = {"type": "json_object"}
@@ -98,12 +98,26 @@ class LLMService:
     # 1. Generate First Viva Question
     # =========================================================================
     def generate_first_question(self, student_name: str, subject: str, difficulty: str) -> str:
+        is_easy = "easy" in difficulty.lower() or "one" in difficulty.lower()
+
+        if is_easy:
+            style_instruction = (
+                "CRITICAL INSTRUCTION FOR EASY DIFFICULTY:\n"
+                "- Keep the question short, direct, and rapid-fire (at most 1-2 sentences).\n"
+                "- The question MUST have a simple, standard one-word or very short phrase answer.\n"
+                "- Example for Machine Learning: 'What type of machine learning uses labeled datasets for training?' (Answer: Supervised learning)."
+            )
+        else:
+            style_instruction = (
+                "The question should test core fundamental concepts and ask the student to explain mechanisms or definitions."
+            )
+
         prompt = (
             f"You are an expert university technical viva examiner conducting an oral exam for candidate {student_name}.\n"
             f"Subject: {subject}\n"
             f"Difficulty Level: {difficulty}\n"
             f"Task: Generate the very first technical viva question (Question 1 of 3).\n"
-            f"The question should test core fundamental concepts and ask the student to explain mechanisms or definitions.\n"
+            f"{style_instruction}\n"
             f"Return ONLY the question text without any prefixes like 'Question 1:' or quotes."
         )
 
@@ -134,6 +148,8 @@ class LLMService:
         history: List[QuestionEvaluation],
         next_question_number: Optional[int]
     ) -> Dict[str, Any]:
+        is_easy = "easy" in difficulty.lower() or "one" in difficulty.lower()
+
         history_summary = [
             {
                 "question_number": item.question_number,
@@ -145,6 +161,21 @@ class LLMService:
             for item in history
         ]
 
+        if is_easy:
+            scoring_instruction = (
+                "IMPORTANT FOR SCORING & NEXT QUESTION (EASY DIFFICULTY):\n"
+                "1. If the student gives a correct one-word or concise answer (e.g., 'Supervised', 'Overfitting', 'SVM', 'Classification'), "
+                "award FULL MARKS (10.0 out of 10.0)! Do NOT penalize for brevity.\n"
+                "2. If partially correct, award 6.0 to 8.0. If incorrect, award 0.0 to 4.0.\n"
+                "3. If next_question_number is provided: Generate another very short, direct rapid-fire question with a simple one-word or short phrase answer."
+            )
+        else:
+            scoring_instruction = (
+                "1. Evaluate the student answer strictly on technical accuracy, completeness, and clarity.\n"
+                "2. Assign a score out of 10.0 (a float between 0.0 and 10.0).\n"
+                "3. If next_question_number is provided: Generate the next question adapting to previous answers."
+            )
+
         prompt = (
             f"You are an expert technical viva examiner conducting an oral examination for student {student_name}.\n"
             f"Subject: {subject}\n"
@@ -152,24 +183,21 @@ class LLMService:
             f"Previous Conversation History: {json.dumps(history_summary)}\n\n"
             f"Current Question #{current_question_number}: {current_question}\n"
             f"Student Answer: {student_answer}\n\n"
-            f"Task:\n"
-            f"1. Evaluate the student answer strictly on technical accuracy, completeness, and clarity.\n"
-            f"2. Assign a score out of 10.0 (a float between 0.0 and 10.0).\n"
-            f"3. Provide constructive feedback highlighting technical strengths, gaps, or corrections.\n"
+            f"Instructions:\n"
+            f"{scoring_instruction}\n"
+            f"Provide feedback highlighting accuracy or corrections.\n"
         )
 
         if next_question_number is not None:
             prompt += (
-                f"4. Generate Question #{next_question_number} of 3. "
-                f"The question MUST adapt dynamically based on the student's previous answer (probing deeper into edge cases, architecture, or addressing misconceptions).\n"
                 f"Format JSON:\n"
-                f'{{"score": 8.0, "feedback": "...", "next_question": "..."}}'
+                f'{{"score": 10.0, "feedback": "...", "next_question": "..."}}'
             )
         else:
             prompt += (
-                f"4. All 3 questions have been completed. Set 'next_question' to null.\n"
+                f"All 3 questions have been completed. Set 'next_question' to null.\n"
                 f"Format JSON:\n"
-                f'{{"score": 8.0, "feedback": "...", "next_question": null}}'
+                f'{{"score": 10.0, "feedback": "...", "next_question": null}}'
             )
 
         if self.openai_client:
@@ -278,43 +306,39 @@ class LLMService:
     def _fallback_first_question(self, subject: str, difficulty: str) -> str:
         s = subject.lower().strip()
         diff = difficulty.capitalize()
+        is_easy = "easy" in difficulty.lower() or "one" in difficulty.lower()
 
-        if "python" in s:
-            if diff == "Easy":
-                return "Can you explain the difference between mutable and immutable data types in Python, giving examples of each?"
+        if "ml" in s or "machine learning" in s or "ai" in s:
+            if is_easy:
+                return "What type of machine learning uses labeled datasets for training?"
+            elif diff == "Hard":
+                return "Explain backpropagation in deep neural networks mathematically, addressing how vanishing and exploding gradients are mitigated using modern techniques."
+            else:
+                return "Explain how gradient descent works, comparing Batch Gradient Descent, Stochastic Gradient Descent (SGD), and Adam optimization."
+        elif "python" in s:
+            if is_easy:
+                return "Are lists in Python mutable or immutable?"
             elif diff == "Hard":
                 return "How does Python's Global Interpreter Lock (GIL) impact multithreading, and how do you achieve true parallelism in CPU-bound Python workloads?"
             else:
                 return "Explain Python's memory management mechanism, focusing on reference counting and cyclic garbage collection."
         elif "dbms" in s or "database" in s or "sql" in s:
-            if diff == "Easy":
-                return "What are the ACID properties in database management systems, and why is each property critical?"
+            if is_easy:
+                return "Which SQL command is used to retrieve data from a database table?"
             elif diff == "Hard":
                 return "How does multi-version concurrency control (MVCC) resolve read-write conflicts in distributed databases, and what are its trade-offs?"
             else:
                 return "Explain the differences between clustered and non-clustered indexes, and how B+ Trees optimize range queries in relational databases."
         elif "os" in s or "operating" in s:
-            if diff == "Easy":
-                return "What is the primary difference between a process and a thread, and how does context switching work between them?"
+            if is_easy:
+                return "Do threads within the same process share the same memory space?"
             elif diff == "Hard":
                 return "Explain the page replacement algorithms (such as LRU vs Clock algorithm) and how translation lookaside buffers (TLB) mitigate virtual memory overhead."
             else:
                 return "What are the four necessary conditions for a deadlock to occur in an operating system, and how can deadlock prevention or detection be implemented?"
-        elif "ml" in s or "machine learning" in s or "ai" in s:
-            if diff == "Easy":
-                return "What is the bias-variance tradeoff in machine learning, and how does model complexity affect both?"
-            elif diff == "Hard":
-                return "Explain backpropagation in deep neural networks mathematically, addressing how vanishing and exploding gradients are mitigated using modern techniques."
-            else:
-                return "Explain how gradient descent works, comparing Batch Gradient Descent, Stochastic Gradient Descent (SGD), and Adam optimization."
-        elif "fastapi" in s or "api" in s or "web" in s:
-            if diff == "Easy":
-                return "What makes FastAPI fast compared to traditional frameworks like Flask or Django, and how does asynchronous I/O (async/await) work in it?"
-            elif diff == "Hard":
-                return "How does FastAPI handle dependency injection with sub-dependencies and yield fixtures, and how does it ensure connection pool safety?"
-            else:
-                return "Explain how Pydantic validation and OpenAPI documentation are integrated into FastAPI request life-cycles."
         else:
+            if is_easy:
+                return f"In one or two words, what is the primary core concept behind {subject}?"
             return f"To start our viva on {subject} ({diff} level), could you explain the fundamental core principles and architecture of {subject}?"
 
     def _fallback_evaluate_and_next(
@@ -326,14 +350,40 @@ class LLMService:
         student_answer: str,
         next_question_number: Optional[int]
     ) -> Dict[str, Any]:
+        ans_lower = student_answer.lower().strip()
+        is_easy = "easy" in difficulty.lower() or "one" in difficulty.lower()
+
+        if is_easy:
+            # Easy mode: award full marks for accurate concise/one-word answers!
+            # Common ML keywords:
+            ml_keywords = ["supervised", "overfitting", "svm", "support vector", "classification", "regression", "clustering", "gradient", "loss", "yes", "mutable", "select"]
+            if any(kw in ans_lower for kw in ml_keywords) or len(ans_lower) > 0:
+                score = 10.0
+                feedback = "Correct! Precise and accurate one-word answer."
+            else:
+                score = 5.0
+                feedback = "Partially accurate, but could be more specific."
+
+            next_question = None
+            if next_question_number == 2:
+                next_question = "What term describes a model learning training noise so intensely that it performs poorly on unseen test data?"
+            elif next_question_number == 3:
+                next_question = "Which classification algorithm finds the optimal hyperplane that maximizes the margin between classes?"
+
+            return {
+                "score": score,
+                "feedback": feedback,
+                "next_question": next_question
+            }
+
+        # Medium / Hard Mode
         words = student_answer.strip().split()
         word_count = len(words)
-        ans_lower = student_answer.lower()
 
         base_score = 5.0
         if word_count < 5:
             base_score = 3.0
-            feedback = "Answer is too brief. In a viva examination, you need to articulate technical explanations and definitions with sufficient detail."
+            feedback = "Answer is too brief. In an advanced viva examination, you need to articulate technical explanations and definitions with sufficient detail."
         elif word_count < 15:
             base_score = 5.5
             feedback = "Basic answer provided, but lacks in-depth technical explanation, key terminology, and concrete examples."
@@ -378,42 +428,29 @@ class LLMService:
         if average_marks >= 8.5:
             overall = (
                 f"Outstanding viva performance by {student_name} on {subject} ({difficulty} level). "
-                f"Demonstrated deep theoretical mastery, excellent communication of technical nuances, "
-                f"and confident problem-solving skills across all questions."
+                f"Demonstrated quick recall, accurate conceptual answers, and excellent precision across all questions."
             )
             areas = [
-                f"Explore advanced distributed or low-level systems architectures in {subject}",
-                f"Practice explaining high-scale benchmark trade-offs and performance tuning"
+                f"Explore advanced mathematical derivations and loss function optimization in {subject}",
+                f"Study complex multi-class and ensemble architectures"
             ]
         elif average_marks >= 7.0:
             overall = (
                 f"Commendable performance by {student_name} on {subject}. "
-                f"Showed solid grasp of foundational concepts and successfully answered the primary questions. "
-                f"Can further improve by providing more structured edge-case analysis."
+                f"Showed solid grasp of foundational concepts and successfully answered the primary questions."
             )
             areas = [
-                f"Deepen familiarity with internal execution models and memory architecture in {subject}",
-                "Provide concrete real-world code/architecture examples during oral explanations"
-            ]
-        elif average_marks >= 5.0:
-            overall = (
-                f"Satisfactory performance by {student_name} in {subject}. "
-                f"Understands basic terminology, but responses were somewhat high-level and lacked technical depth in follow-up queries."
-            )
-            areas = [
-                f"Review core fundamentals and standard terminology in {subject}",
-                "Focus on explaining the 'why' behind system behaviors rather than just definitions",
-                "Practice answering viva-style oral questions with structured examples"
+                f"Deepen familiarity with internal hyperparameter tuning in {subject}",
+                "Practice explaining algorithmic trade-offs in depth"
             ]
         else:
             overall = (
-                f"The candidate struggled with core concepts of {subject} during the viva. "
-                f"Several responses were incomplete or lacked technical accuracy."
+                f"Satisfactory performance by {student_name} in {subject}. "
+                f"Understands basic terminology, but could benefit from broader revision."
             )
             areas = [
-                f"Revisit foundational coursework and syllabus for {subject}",
-                "Practice writing out and explaining standard algorithms and paradigms",
-                "Work on verbal articulation of technical processes and definitions"
+                f"Review core fundamentals and standard terminology in {subject}",
+                "Practice rapid-fire technical quizzes on standard ML algorithms"
             ]
 
         return {
